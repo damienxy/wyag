@@ -186,3 +186,25 @@ def repo_find(path=".", required=True):
 
     # Recursive case
     return repo_find(parent, required)
+
+
+class GitObject(object):
+
+    repo = None
+
+    def __init__(self, repo, data=None):
+        self.repo = repo
+
+        if data != None:
+            self.deserialize(data)
+
+    def serialize(self):
+        # This function MUST be implemented by subclasses.
+        # It must read the object's contents from self.data, a byte string,
+        # and do whatever it takes to convert it to a meaningful representation.
+        # What exactly that means, depends on each subclass.
+
+        raise Exception("Not implemented")
+
+    def deserialize(self):
+        raise Exception("Not implemented")
