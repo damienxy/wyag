@@ -74,3 +74,33 @@ class GitRepository(object):
             if vers != 0 and not force:
                 raise Exception(
                     "Unsupported repository format version %s" % vers)
+
+
+def repo_path(repo, *path):
+    # Computes path under repo's gitdir
+
+    return os.path.join(repo.gitdir, *path)
+
+
+def repo_dir(repo, *path, mkdir=False):
+    # Same as repo_path, but mkdir *path if mkdir
+
+    path = repo_path(repo, *path)
+    if os.path.exists(path):
+        return path
+    else:
+        raise Exception("Not a directory %s" % path)
+
+    if mkdir:
+        os.makedirs(path)
+        return path
+    else:
+        return None
+
+
+def repo_file(repo, *path, mkdir=False):
+    # Same as repo_path, but creates dirname(*path) if absent
+    # E.g. repo_file(r, \"refs\", \"remotes\", \"origin\", \"HEAD\") will create .git/refs/remotes/origin
+
+    if repo_dir(repo, *path[:-1], mkdir=mkdir):
+        return repo_path(repo, *path)
