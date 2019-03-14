@@ -106,7 +106,7 @@ def repo_file(repo, *path, mkdir=False):
         return repo_path(repo, *path)
 
 
-def create_repo(path):
+def repo_create(path):
     # Creates a new repo at path
     repo = GitRepository(path, True)
 
@@ -150,3 +150,39 @@ def repo_default_config():
     ret.set("core", "bare", "false")
 
     return ret
+
+
+argsp = argsubparsers.add_parser(
+    "init", help="Initialize a new, empty repository")
+
+argsp.add_argument("path",
+                   metavar="directory",
+                   nargs="?",
+                   default=".",
+                   help="Where to create the repository")
+
+
+def cmd_init(args):
+    repo_create(args.path)
+
+
+def repo_find(path=".", required=True):
+    path = os.path.realpath(path)
+
+    if os.path.isdir(os.path.join(path, ".git")):
+        return GitRepository(path)
+
+    # If we haven't returned, recurse in parent
+    parent = os.path.realpath(os.path.join(path, ".."))
+
+    if parent == path:
+        # Bottom case
+        # os.path.join("/", "..") == "/"
+        # If parent == path, then path is root
+        if required:
+            raise Exception("No git directory")
+        else:
+            return None
+
+    # Recursive case
+    return repo_find(parent, required)
