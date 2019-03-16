@@ -750,3 +750,26 @@ def cmd_tag(args):
     else:
         refs = ref_list(repo)
         show_ref(repo, refs["tags"], with_hash=False)
+
+
+argsp.add_subparsers(
+    "rev-parse", help="Parse revision (or other objects') identifiers")
+
+
+argsp.add_argument("--wyag-type",
+                   metavar="type",
+                   dest="type",
+                   choices=["blob", "commit", "tag", "tree"],
+                   default=None,
+                   help="Specify the expected type")
+argsp.add_argument("name",
+                   help="The name to parse")
+
+
+def cmd_rev_parse(args):
+    if args.type:
+        fmt = args.type.encode()
+
+    repo = repo_find()
+
+    print(object_find(repo, args.name, fmt, follow=True))
