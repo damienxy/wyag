@@ -247,9 +247,77 @@ def object_read(repo, sha):
         return c(repo, raw[y+1:])
 
 
+def object_resolve(repo, name):
+    # Resolve name to an object hash in repo
+
+    # This function is aware of:
+        # the HEAD literal
+        # short and long hashes
+        # tags
+        # branches
+        # remote branches
+
+    candidates = list()
+    hashRE = re.compile(r"^[0-9A-Fa-f]{1,16}$")
+
+    # Abort if empty string
+    if not name.strip():
+        return None
+
+    # Head is nonambiguous
+    if name == "HEAD":
+        return [ref_resolve(repo, "HEAD")]
+
+    if hashRE.match(name):
+        if len(name) == 40:
+            # This is a complete hash
+            return [name.lower()]
+        elif len(name) >= 4:
+            # This is a small hash, 4 being the minimal length for
+            # git to consider something a short hash, see its git-rev-parse documentation
+            name = name.lower()
+            prefix = name[0:2]
+            path = repo_dir(repo, "objects", prefix, mkdir=False)
+            if path:
+                rem = name[2:]
+                for f in os.listdir(path):
+                    if f.startswith(rem):
+                        candidates.append(prefix + f)
+
+    return candidates
+
+
 def object_find(repo, name, fmt=None, follow=True):
-    # Placeholder function
-    return name
+    sha = object_resolve(repo, name)
+
+    if not sha:
+        raise Exception("No such reference {}.".format(name))
+
+    if len(sha) > 1:
+        raise Exception(
+            "Ambiguous reference {}: Candidates are:\n - {}.".format(name, "\n - ".join(sha)))
+
+    sha = sha[0]
+
+    if not fmt:
+        return sha
+
+    while True:
+        obj = object_read(repo, sha)
+
+        if obj.fmt == fmt:
+            return sha
+
+        if not follow:
+            return None
+
+        # Follow tags
+        if obj.fmt == b'tag':
+            sha = obj.kvlm[b'object'].decode("ascii")
+        elif obj.fmt == b'commit' and fmt == b'tree':
+            sha = obj.kvlm[b'tree'].decode("ascii")
+        else:
+            return None
 
 
 def object_write(obj, actually_write=True):
