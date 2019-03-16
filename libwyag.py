@@ -773,3 +773,44 @@ def cmd_rev_parse(args):
     repo = repo_find()
 
     print(object_find(repo, args.name, fmt, follow=True))
+
+
+class GitIndexEntry(object):
+
+    # The last time a file's metadata changed:
+    # This is a tuple (seconds, nanoseconds)
+    ctime = None
+
+    # The last time a file's data changed:
+    # This is a tuple (seconds, nanoseconds)
+    mtime = None
+
+    # The ID of the device containing this file:
+    dev = None
+
+    # The file's inode number:
+    ino = None
+
+    # The object type, either b1000 (regular), b1010 (symlink) or b1110 (gitlink):
+    mode_type = None
+
+    # User ID of owner:
+    uid = None
+
+    # Group ID of owner:
+    gid = None
+
+    # Size of the object, in bytes:
+    size = None
+
+    # The object's hash as a hex string:
+    obj = None
+
+    flag_assume_valid = None
+    flag_extended = None
+    flag_stage = None
+
+    # Length of the name if < 0xFFF, -1 otherwise:
+    flag_name_length = None
+
+    name = None
