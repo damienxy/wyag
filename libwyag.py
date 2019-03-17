@@ -1,4 +1,3 @@
-import zlib
 import argparse
 import collections
 import configparser
@@ -71,7 +70,7 @@ class GitRepository(object):
 
         if not force:
             vers = int(self.conf.get("core", "repositoryformatversion"))
-            if vers != 0 and not force:
+            if vers != 0:
                 raise Exception(
                     "Unsupported repository format version %s" % vers)
 
@@ -86,10 +85,12 @@ def repo_dir(repo, *path, mkdir=False):
     # Same as repo_path, but mkdir *path if mkdir
 
     path = repo_path(repo, *path)
+
     if os.path.exists(path):
-        return path
-    else:
-        raise Exception("Not a directory %s" % path)
+        if os.path.isdir(path):
+            return path
+        else:
+            raise Exception("Not a directory %s" % path)
 
     if mkdir:
         os.makedirs(path)
@@ -206,7 +207,7 @@ class GitObject(object):
 
         raise Exception("Not implemented")
 
-    def deserialize(self):
+    def deserialize(self, data):
         raise Exception("Not implemented")
 
 
@@ -214,7 +215,7 @@ def object_read(repo, sha):
     # Read object object_id from git repo.
     # Return a GitObject whose exact type depends on the object.
 
-    path = repo_file(repo, sha[0:2], sha[2:])
+    path = repo_file(repo, "objects", sha[0:2], sha[2:])
 
     with open(path, "rb") as f:
         raw = zlib.decompress(f.read())
@@ -398,6 +399,8 @@ argsp.add_argument("path",
 def cmd_hash_object(args):
     if args.write:
         repo = GitRepository(".")
+    else:
+        repo = None
 
     with open(args.path, "rb") as fd:
         sha = object_hash(fd, args.type.encode(), repo)
@@ -505,8 +508,8 @@ class GitCommit(GitObject):
         return kvlm_serialize(self.kvlm)
 
 
-argsp = argsubparsers.add_parser("log",
-                                 help="Display history of a given commit")
+argsp = argsubparsers.add_parser(
+    "log", help="Display history of a given commit")
 
 argsp.add_argument("commit",
                    default="HEAD",
@@ -545,7 +548,7 @@ def log_graphviz(repo, sha, seen):
         log_graphviz(repo, p, seen)
 
 
-class GitTreeLeave(object):
+class GitTreeLeaf(object):
 
     def __init__(self, mode, path, sha):
         self.mode = mode
@@ -566,9 +569,10 @@ def tree_parse_one(raw, start=0):
     path = raw[x+1:y]
 
     # Read the SHA and convert to a hex string
+    # hex() adds 0x in front, we don't want that and drop it
     sha = hex(int.from_bytes(raw[y+1:y+21], "big"))[2:]
 
-    return y+21, GitTreeLeave(mode, path, sha)
+    return y+21, GitTreeLeaf(mode, path, sha)
 
 
 def tree_parse(raw):
@@ -582,7 +586,7 @@ def tree_parse(raw):
     return ret
 
 
-def tree_serializer(obj):
+def tree_serialize(obj):
     ret = b''
     for i in obj.items:
         ret += i.mode
@@ -602,11 +606,11 @@ class GitTree(GitObject):
         self.items = tree_parse(data)
 
     def serialize(self):
-        return tree_serializer(self)
+        return tree_serialize(self)
 
 
-argsp = argsubparsers.add_parser("ls-tree",
-                                 help="Pretty-print a tree object")
+argsp = argsubparsers.add_parser(
+    "ls-tree", help="Pretty-print a tree object")
 
 argsp.add_argument("object",
                    help="The object to show")
@@ -625,14 +629,14 @@ def cmd_ls_tree(args):
             item.path.decode("ascii")))
 
 
-argsp = argsubparsers.add_parser("checkout",
-                                 help="Checkout a commit inside of a directory")
+argsp = argsubparsers.add_parser(
+    "checkout", help="Checkout a commit inside of a directory")
 
 argsp.add_argument("commit",
                    help="The commit or tree to checkout")
 
 argsp.add_argument("path",
-                   help="The EMPTY directly to checkout on")
+                   help="The EMPTY directory to checkout on")
 
 
 def cmd_checkout(args):
@@ -664,7 +668,7 @@ def tree_checkout(repo, tree, path):
             os.mkdir(dest)
             tree_checkout(repo, obj, dest)
         elif obj.fmt == b'blob':
-            with open(dest, 'wb') as f:
+            with open(dest, "wb") as f:
                 f.write(obj.blobdata)
 
 
@@ -674,7 +678,7 @@ def ref_resolve(repo, ref):
         data = fp.read()[:-1]
 
     # Indirect reference (e.g. "ref: refs/remotes/origin/master")
-    if data.startsWith("ref: "):
+    if data.startswith("ref: "):
         return ref_resolve(repo, data[5:])
     # Direct reference (e.g. "76ed6f04dba65faf4420e9de158e0dc4000f37c5")
     else:
@@ -698,7 +702,8 @@ def ref_list(repo, path=None):
     return ret
 
 
-argsp = argsubparsers.add_parser("show-ref", help="List references")
+argsp = argsubparsers.add_parser(
+    "show-ref", help="List references")
 
 
 def cmd_show_ref(args):
@@ -724,7 +729,8 @@ class GitTag(GitCommit):
     fmt = b'tag'
 
 
-argsp = argsubparsers.add_parser("tag", help="List and create tags")
+argsp = argsubparsers.add_parser(
+    "tag", help="List and create tags")
 
 argsp.add_argument("-a",
                    action="store_true",
@@ -752,8 +758,8 @@ def cmd_tag(args):
         show_ref(repo, refs["tags"], with_hash=False)
 
 
-argsp.add_subparsers(
-    "rev-parse", help="Parse revision (or other objects') identifiers")
+argsp = argsubparsers.add_parser(
+    "rev-parse", help="Parse revision (or other object's) identifiers")
 
 
 argsp.add_argument("--wyag-type",
@@ -762,6 +768,7 @@ argsp.add_argument("--wyag-type",
                    choices=["blob", "commit", "tag", "tree"],
                    default=None,
                    help="Specify the expected type")
+
 argsp.add_argument("name",
                    help="The name to parse")
 
